@@ -6,3 +6,4 @@ lxml
 python-docx
 PyMuPDF
 gunicorn
+torch
