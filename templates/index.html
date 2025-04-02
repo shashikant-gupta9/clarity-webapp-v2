@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Clarity</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f9f9f9;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+    }
+    .container {
+      background: #ffffff;
+      box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.1);
+      border-radius: 10px;
+      padding: 20px;
+      max-width: 800px;
+      width: 90%;
+    }
+    h1 {
+      text-align: center;
+      color: #6a0dad;
+      margin-bottom: 20px;
+    }
+    .section {
+      margin-bottom: 20px;
+    }
+    .section label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: bold;
+      color: #333;
+    }
+    .section textarea,
+    .section input[type='file'] {
+      width: 100%;
+      padding: 10px;
+      margin-bottom: 10px;
+      border: 1px solid #ddd;
+      border-radius: 5px;
+      font-size: 16px;
+    }
+    .section button {
+      background-color: #6a0dad;
+      color: #fff;
+      border: none;
+      padding: 10px 20px;
+      font-size: 16px;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    .section button:hover {
+      background-color: #520b7a;
+    }
+    .summary-output,
+    #answer {
+      padding: 10px;
+      border: 1px solid #ddd;
+      border-radius: 5px;
+      background-color: #f4f4f4;
+      font-size: 16px;
+      color: #333;
+      min-height: 50px;
+    }
+    #answer {
+      color: #4B0082;
+      font-weight: bold;
+    }
+    .utility-buttons {
+      display: flex;
+      gap: 10px;
+      margin-top: 10px;
+    }
+    footer {
+      text-align: center;
+      margin-top: 20px;
+      color: #777;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Clarity</h1>
+
+    <div class="section">
+      <label for="input">Paste Link or Text:</label>
+      <textarea id="input" placeholder="Enter the link or text here..."></textarea>
+      <button onclick="summarize()">Summarize</button>
+    </div>
+
+    <div class="section">
+      <label for="fileInput">Or Upload a File (.txt, .pdf, .docx):</label>
+      <input type="file" id="fileInput" accept=".txt,.pdf,.docx" />
+      <button onclick="uploadFile()">Upload & Summarize</button>
+    </div>
+
+    <div class="section summary-output">
+      <label for="summary">Summary:</label>
+      <div id="summary">The summary will appear here...</div>
+      <div class="utility-buttons">
+        <button onclick="copySummary()">Copy</button>
+        <button onclick="window.print()">Print</button>
+      </div>
+    </div>
+
+    <div class="section ask-questions">
+      <label for="questions">Ask Questions:</label>
+      <textarea id="questions" placeholder="Ask a question based on the summary..."></textarea>
+      <button onclick="submitQuestion()">Submit</button>
+      <div id="answer" style="margin-top: 10px;"></div>
+    </div>
+  </div>
+
+  <footer>
+    &copy; 2025 Clarity. All rights reserved.
+  </footer>
+
+  <script>
+    let latestSummary = "";
+
+    async function summarize() {
+      const input = document.getElementById("input").value.trim();
+      const summaryDiv = document.getElementById("summary");
+      const answerDiv = document.getElementById("answer");
+      answerDiv.textContent = "";
+
+      if (!input) {
+        summaryDiv.textContent = "Please provide valid input.";
+        return;
+      }
+
+      summaryDiv.textContent = "Processing your input...";
+
+      const isUrl = input.startsWith("http://") || input.startsWith("https://");
+
+      const response = await fetch("/summarize", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(isUrl ? { url: input } : { text: input }),
+      });
+
+      const data = await response.json();
+
+      if (data.summary) {
+        latestSummary = data.summary;
+        summaryDiv.textContent = data.summary;
+      } else {
+        summaryDiv.textContent = data.error || "Something went wrong. Please try again.";
+      }
+    }
+
+    async function submitQuestion() {
+      const question = document.getElementById("questions").value.trim();
+      const answerDiv = document.getElementById("answer");
+
+      if (!question) {
+        answerDiv.textContent = "Please enter a valid question.";
+        return;
+      }
+
+      if (!latestSummary) {
+        answerDiv.textContent = "Please summarize something first.";
+        return;
+      }
+
+      answerDiv.textContent = "Fetching answer...";
+
+      const response = await fetch("/ask", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ context: latestSummary, question: question }),
+      });
+
+      const data = await response.json();
+      answerDiv.textContent = data.answer || data.error || "Something went wrong.";
+    }
+
+    function copySummary() {
+      const text = document.getElementById("summary").textContent;
+      navigator.clipboard.writeText(text).then(() => {
+        alert("Summary copied to clipboard!");
+      });
+    }
+
+    async function uploadFile() {
+      const fileInput = document.getElementById("fileInput");
+      const file = fileInput.files[0];
+      const summaryDiv = document.getElementById("summary");
+      const answerDiv = document.getElementById("answer");
+      answerDiv.textContent = "";
+
+      if (!file) {
+        alert("Please select a file first.");
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append("file", file);
+
+      summaryDiv.textContent = "Processing uploaded file...";
+
+      const response = await fetch("/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = await response.json();
+
+      if (data.summary) {
+        latestSummary = data.summary;
+        summaryDiv.textContent = data.summary;
+      } else {
+        summaryDiv.textContent = data.error || "Something went wrong.";
+      }
+    }
+  </script>
+</body>
+</html>
